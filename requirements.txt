@@ -1,0 +1,3 @@
+cchardet
+aiohttp
+google-api-python-client
