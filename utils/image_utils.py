@@ -32,6 +32,15 @@ def adaptivethreshold(image):
     return image_prep
 
 
+def otsuthreshold(image):
+    ''' apply the OTSU threshold to the grayscale image optimize for OCR '''
+
+    image_prep = cv2.GaussianBlur(image, (5, 5), 0)
+    image_prep = cv2.threshold(image_prep, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+
+    return image_prep
+
+
 def getemotion(face):
         ''' filter return for possible to very_likely emotions '''
 
@@ -47,15 +56,6 @@ def getemotion(face):
                 detected_emotions[face[emotion]] += [emotion]
 
         return detected_emotions
-
-
-def otusthreshold(image):
-    ''' apply the OTSU threshold to the grayscale image optimize for OCR '''
-
-    image_prep = cv2.GaussianBlur(image, (5, 5), 0)
-    image_prep = cv2.threshold(image_prep, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-
-    return image_prep
 
 
 def drawmostlikelyemotion(faces, image):

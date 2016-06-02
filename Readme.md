@@ -32,6 +32,40 @@ the most likely mood.
 
 ## Text Detection 
 
+### Image Pre-Processing
+In general it's very important to prepare the images where you want to apply the OCR algorithms on (e.g. look at 
+[Image Preprossesing for license plate detection](http://stackoverflow.com/a/28936254/2054009) 
+or [OpenCV Image Thresholding](http://docs.opencv.org/3.1.0/d7/d4d/tutorial_py_thresholding.html#gsc.tab=0)). 
+
+
+`
+def adaptivethreshold(image):
+    image_prep = cv2.medianBlur(image, 5)
+    image_prep = cv2.adaptiveThreshold(image_prep, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+return image
+`
+    
+`
+def otsuthreshold(image):
+    image_prep = cv2.GaussianBlur(image, (5, 5), 0)
+    image_prep = cv2.threshold(image_prep, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+return image
+`
+
+
+In both cases the `adaptivethrshold` or the `otsuthreshold` and or blur filters can be fine-tuned. If you want to see how
+the artifacts look like on the filtered image you can send the prepared picture `image_prep` into the `self._processed_channel`. 
+
+When using the rest API these image preparations are executed in a single thread via `loop.run_in_executor()` as 
+you can see in the code.
+
+`
+    # run the picture optimization in a different thread
+    future = self._loop.run_in_executor(None, self._imageprep, image)
+         image, request = yield from future
+`
+
+
 ### Webcam
 To use the local webcam for text detection or API testing define the service like shown here:
 `imageservice = ImageRecognitionService(restinterface='false', detectiontype='text')`. 

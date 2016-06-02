@@ -49,7 +49,7 @@ class GoogleCloudWorker(Thread):
             image_prep = image_utils.adaptivethreshold(image_prep)
 
         else:
-            image_prep = image_utils.otusthreshold(image_prep)
+            image_prep = image_utils.otsuthreshold(image_prep)
 
         image_str = image_utils.convertimagetojpgstring(image_prep)
 

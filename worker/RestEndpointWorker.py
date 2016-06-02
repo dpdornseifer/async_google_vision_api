@@ -30,7 +30,8 @@ class RestEndpointWorker(Thread):
         self._GOOGLE_VISION_API_ENDPOINT = 'https://vision.googleapis.com/v1/images:annotate?key={}'\
             .format(self._API_KEY)
 
-    def _imageprep(self, image, max_results=4, threshold='otsu'):
+    @staticmethod
+    def _imageprep(image, max_results=4, threshold='otsu'):
 
         image_prep, image_show = image_utils.convertimagetoopencvarray(image)
 
@@ -38,18 +39,17 @@ class RestEndpointWorker(Thread):
             image_prep = image_utils.adaptivethreshold(image_prep)
 
         else:
-            image_prep = image_utils.otusthreshold(image_prep)
-
+            image_prep = image_utils.otsuthreshold(image_prep)
 
         image_str = image_utils.convertimagetojpgstring(image_prep)
-
-        # build request with preprocessed image
         request = google_utils.buildrequest(image_str, max_results, 'TEXT_DETECTION')
 
         return image_show, request
 
     @asyncio.coroutine
     def _executetextrecognition(self, session, request, image):
+        ''' execute the post request to the Google Cloud Vision API in an async way '''
+
         response = yield from session.post(self._GOOGLE_VISION_API_ENDPOINT, data=json.dumps(request))
         response_json = yield from response.json()
         self._logger.debug('response: {}'.format(response_json))
@@ -58,7 +58,7 @@ class RestEndpointWorker(Thread):
 
     @asyncio.coroutine
     def _detecttext(self, request):
-        ''' execute the object recognition in a different thread to keep the app responsive '''
+        ''' does the image preparation and finally executes the post to the ML backend '''
 
         # get the image from the post request
         data = yield from request.post()
@@ -69,12 +69,14 @@ class RestEndpointWorker(Thread):
         future = self._loop.run_in_executor(None, self._imageprep, image)
         image, request = yield from future
 
+        # execute the post request in its own async context
         with aiohttp.ClientSession(loop=self._loop) as session:
             response_json, image = yield from self._executetextrecognition(session, request, image)
 
         # just add a picture to the queue if faces have been recognized, filter for non empty json arrays
         self._processed_channel.put((response_json, image))
 
+        # process the response, sent and empty json object if no text has been detected by the Vision API
         if bool(response_json['responses'][0]):
             recognized_text = response_json['responses'][0]['textAnnotations'][0]
         else:
@@ -97,8 +99,9 @@ class RestEndpointWorker(Thread):
         return srv, handler
 
     def run(self):
-        print("Rest Eventloop Server is being started")
+        ''' run the eventloop in a different thread than the main loop which is used for OpenCV methods '''
 
+        print("Rest Eventloop Server is being started")
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
         self._tid = current_thread()
@@ -106,6 +109,8 @@ class RestEndpointWorker(Thread):
         self._loop.run_forever()
 
     def stop(self):
+        ''' shutdown the eventloop and the connections in the right way'''
+
         self._srv.close()
         self._loop.run_until_complete(self._srv.wait_closed())
         self._loop.run_until_complete(self._app.shutdown())
