@@ -4,8 +4,8 @@ import logging
 import aiohttp
 import cv2
 import numpy as np
-import base64
 from threading import Thread
+from utils import google_utils, image_utils
 
 
 class GoogleCloudWorker(Thread):
@@ -20,35 +20,10 @@ class GoogleCloudWorker(Thread):
         self._raw_channel = raw_channel
         self._processed_channel = processed_channel
         self._logger = logging.getLogger(__name__)
+
         self._API_KEY = ''
         self._GOOGLE_VISION_API_ENDPOINT = 'https://vision.googleapis.com/v1/images:annotate?key={}'\
             .format(self._API_KEY)
-
-    @staticmethod
-    def _buildrequest(image_str, max_results, detection_type):
-        request = {'requests':
-            [
-                {
-                    'image':
-                        {
-                            'content': base64.b64encode(image_str).decode('UTF-8')
-                        },
-                    'features':
-                        [
-                            {
-                                'type': detection_type,
-                                'maxResults': max_results
-                            }
-                        ],
-                    'imageContext': {
-                        'languageHints': [
-                            'en'
-                        ]
-                    }
-                }
-            ]
-        }
-        return request
 
     @asyncio.coroutine
     def _executefacerecognition(self, session, image, max_results=4):
@@ -56,7 +31,7 @@ class GoogleCloudWorker(Thread):
         image_buf = cv2.imencode('.jpg', image)[1]
         image_str = np.array(image_buf).tostring()
 
-        request = self._buildrequest(image_str, max_results, 'FACE_DETECTION')
+        request = google_utils.buildrequest(image_str, max_results, 'FACE_DETECTION')
 
         response = yield from session.post(self._GOOGLE_VISION_API_ENDPOINT, data=json.dumps(request))
         response_json = yield from response.json()
@@ -71,26 +46,20 @@ class GoogleCloudWorker(Thread):
         image_prep = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         if threshold == 'adaptive':
-            # adaptive threshold
-            image_prep = cv2.medianBlur(image_prep, 5)
-            image_prep = cv2.adaptiveThreshold(image_prep, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+            image_prep = image_utils.adaptivethreshold(image_prep)
 
         else:
-            # otsu
-            image_prep = cv2.GaussianBlur(image_prep, (5, 5), 0)
-            image_prep = cv2.threshold(image_prep, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
+            image_prep = image_utils.otusthreshold(image_prep)
 
-        # convert cv2 to .jpg to make it compatible for google vision api
-        image_buf = cv2.imencode('.jpg', image_prep)[1]
-        image_str = np.array(image_buf).tostring()
+        image_str = image_utils.convertimagetojpgstring(image_prep)
 
-        request = self._buildrequest(image_str, max_results, 'TEXT_DETECTION')
+        request = google_utils.buildrequest(image_str, max_results, 'TEXT_DETECTION')
 
         response = yield from session.post(self._GOOGLE_VISION_API_ENDPOINT, data=json.dumps(request))
         response_json = yield from response.json()
         self._logger.debug('response: {}'.format(response_json))
 
-        return response_json, image_prep
+        return response_json, image
 
     def run(self):
         print('GoogleCloudWorker: Vision API worker has been started')

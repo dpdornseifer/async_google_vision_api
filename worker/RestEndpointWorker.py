@@ -2,12 +2,10 @@ import asyncio
 import json
 import logging
 import aiohttp
-import cv2
-import numpy as np
-import base64
 from threading import Thread, current_thread
 from aiohttp import web
 from aiohttp.web import Application
+from utils import google_utils, image_utils
 
 
 class RestEndpointWorker(Thread):
@@ -27,61 +25,26 @@ class RestEndpointWorker(Thread):
         self._srv = None
         self._handler = None
         self._app = None
+
         self._API_KEY = ''
         self._GOOGLE_VISION_API_ENDPOINT = 'https://vision.googleapis.com/v1/images:annotate?key={}'\
             .format(self._API_KEY)
 
-    @staticmethod
-    def _buildrequest(image_str, max_results, detection_type):
-        request = {'requests':
-            [
-                {
-                    'image':
-                        {
-                            'content': base64.b64encode(image_str).decode('UTF-8')
-                        },
-                    'features':
-                        [
-                            {
-                                'type': detection_type,
-                                'maxResults': max_results
-                            }
-                        ],
-                    'imageContext': {
-                        'languageHints': [
-                            'en'
-                        ]
-                    }
-                }
-            ]
-        }
-        return request
-
     def _imageprep(self, image, max_results=4, threshold='otsu'):
 
-        image_array = np.asarray(bytearray(image), dtype="uint8")
-        image_prep = cv2.imdecode(image_array, cv2.IMREAD_GRAYSCALE)
+        image_prep, image_show = image_utils.convertimagetoopencvarray(image)
 
-        # image to show the detected artifacts on later in the main thread
-        image_show = cv2.imdecode(image_array, cv2.IMREAD_ANYCOLOR)
-
-        # apply some ocr realted optimization on the picture
         if threshold == 'adaptive':
-            # adaptive threshold
-            #image_prep = cv2.medianBlur(image_prep, 5)
-            image_prep = cv2.adaptiveThreshold(image_prep, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+            image_prep = image_utils.adaptivethreshold(image_prep)
 
         else:
-            # otsu
-            #image_prep = cv2.GaussianBlur(image_prep, (5, 5), 0)
-            image_prep = cv2.threshold(image_prep, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+            image_prep = image_utils.otusthreshold(image_prep)
 
-        # convert cv2 to .jpg to make it compatible for google vision api
-        image_buf = cv2.imencode('.jpg', image_prep)[1]
-        image_str = np.array(image_buf).tostring()
+
+        image_str = image_utils.convertimagetojpgstring(image_prep)
 
         # build request with preprocessed image
-        request = self._buildrequest(image_str, max_results, 'TEXT_DETECTION')
+        request = google_utils.buildrequest(image_str, max_results, 'TEXT_DETECTION')
 
         return image_show, request
 
@@ -97,8 +60,8 @@ class RestEndpointWorker(Thread):
     def _detecttext(self, request):
         ''' execute the object recognition in a different thread to keep the app responsive '''
 
+        # get the image from the post request
         data = yield from request.post()
-
         input_image = data['img'].file
         image = input_image.read()
 
@@ -107,7 +70,6 @@ class RestEndpointWorker(Thread):
         image, request = yield from future
 
         with aiohttp.ClientSession(loop=self._loop) as session:
-            # response = (response_json, image)
             response_json, image = yield from self._executetextrecognition(session, request, image)
 
         # just add a picture to the queue if faces have been recognized, filter for non empty json arrays
