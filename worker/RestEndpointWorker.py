@@ -2,10 +2,11 @@ import asyncio
 import json
 import logging
 import aiohttp
-from threading import Thread, current_thread
+from threading import Thread
+from threading import current_thread
 from aiohttp import web
-from aiohttp.web import Application
-from utils import google_utils, image_utils
+from utils import google_utils
+from utils import image_utils
 
 
 class RestEndpointWorker(Thread):
@@ -13,13 +14,10 @@ class RestEndpointWorker(Thread):
     def __init__(self, port, address, raw_channel, processed_channel):
         super(RestEndpointWorker, self).__init__()
         self._logger = logging.getLogger(__name__)
-
         self._port = port
         self._address = address
-
         self._raw_channel = raw_channel
         self._processed_channel = processed_channel
-
         self._loop = None
         self._tid = None
         self._srv = None
@@ -32,6 +30,7 @@ class RestEndpointWorker(Thread):
 
     @staticmethod
     def _imageprep(image, max_results=4, threshold='otsu'):
+        """ applies the given optimization method to the raw image """
 
         image_prep, image_show = image_utils.convertimagetoopencvarray(image)
 
@@ -48,7 +47,7 @@ class RestEndpointWorker(Thread):
 
     @asyncio.coroutine
     def _executetextrecognition(self, session, request, image):
-        ''' execute the post request to the Google Cloud Vision API in an async way '''
+        """ execute the post request to the Google Cloud Vision API in an async way """
 
         response = yield from session.post(self._GOOGLE_VISION_API_ENDPOINT, data=json.dumps(request))
         response_json = yield from response.json()
@@ -58,7 +57,7 @@ class RestEndpointWorker(Thread):
 
     @asyncio.coroutine
     def _detecttext(self, request):
-        ''' does the image preparation and finally executes the post to the ML backend '''
+        """ does the image preparation and finally executes the post to the ML backend """
 
         # get the image from the post request
         data = yield from request.post()
@@ -89,8 +88,9 @@ class RestEndpointWorker(Thread):
 
     @asyncio.coroutine
     def init(self, loop):
-        app = Application(loop=loop)
+        app = web.Application(loop=loop)
 
+        # the only route available /detectext
         app.router.add_route('POST', '/detecttext', self._detecttext)
 
         handler = app.make_handler()
@@ -99,7 +99,7 @@ class RestEndpointWorker(Thread):
         return srv, handler
 
     def run(self):
-        ''' run the eventloop in a different thread than the main loop which is used for OpenCV methods '''
+        """ run the eventloop in a different thread than the main loop which is used for OpenCV methods """
 
         print("Rest Eventloop Server is being started")
         self._loop = asyncio.new_event_loop()
@@ -109,7 +109,7 @@ class RestEndpointWorker(Thread):
         self._loop.run_forever()
 
     def stop(self):
-        ''' shutdown the eventloop and the connections in the right way'''
+        """ shutdown the eventloop and the connections in the right way"""
 
         self._srv.close()
         self._loop.run_until_complete(self._srv.wait_closed())

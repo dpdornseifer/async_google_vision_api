@@ -3,12 +3,11 @@ import time
 import cv2
 from queue import Queue
 from utils import image_utils
-from worker.GoogleCloudWorker import GoogleCloudWorker
-from worker.RestEndpointWorker import RestEndpointWorker
+from worker import GoogleCloudWorker, RestEndpointWorker
 
 
 class ImageRecognitionService():
-    ''' start the main thread is primarily for showing the processed images '''
+    """ start the main thread is primarily for showing the processed images """
 
     def __init__(self, detectiontype='text', restinterface='true'):
         self._logger = logging.getLogger(__name__)
@@ -29,7 +28,7 @@ class ImageRecognitionService():
             self._capture = None
 
     def _getframe(self):
-        ''' use the opencv library to take a frame from the webcam '''
+        """ use the opencv library to take a frame from the webcam """
 
         ret, frame = self._capture.read()
         time.sleep(2)
@@ -45,13 +44,13 @@ class ImageRecognitionService():
 
         if self._restinterface == 'true':
             # Rest API server / eventloop
-            rest_eventloop = RestEndpointWorker(8080, '0.0.0.0', self._raw_channel, self._processed_channel)
+            rest_eventloop = RestEndpointWorker.RestEndpointWorker(8080, '0.0.0.0', self._raw_channel, self._processed_channel)
             rest_eventloop.daemon = True
             rest_eventloop.start()
 
         else:
             # instanciate locale image processing module / Google Image Recognition Worker
-            googlecloudworker = GoogleCloudWorker(self._raw_channel, self._processed_channel, self._detectiontype)
+            googlecloudworker = GoogleCloudWorker.GoogleCloudWorker(self._raw_channel, self._processed_channel, self._detectiontype)
             googlecloudworker.daemon = True
             googlecloudworker.start()
 

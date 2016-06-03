@@ -9,8 +9,8 @@ from utils import google_utils, image_utils
 
 
 class GoogleCloudWorker(Thread):
-    ''' worker class which is started in its own thread and is responsible for handling all the requests to the Google
-    vision API '''
+    """ worker class which is started in its own thread and is responsible for handling all the requests to the Google
+    vision API """
 
     def __init__(self, raw_channel, processed_channel, detectiontype='text'):
         Thread.__init__(self)
@@ -27,6 +27,8 @@ class GoogleCloudWorker(Thread):
 
     @asyncio.coroutine
     def _executefacerecognition(self, session, image, max_results=4):
+        """ async execution of the face_detection request """
+
         # convert cv2 to .jpg to make it compatible for google vision api
         image_buf = cv2.imencode('.jpg', image)[1]
         image_str = np.array(image_buf).tostring()
@@ -41,18 +43,20 @@ class GoogleCloudWorker(Thread):
 
     @asyncio.coroutine
     def _executetextrecognition(self, session, image, max_results=4, threshold='otsu'):
+        """ async execution of the text_detection request """
 
         # do image preprocessing to increase accuracy
         image_prep = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
         if threshold == 'adaptive':
             image_prep = image_utils.adaptivethreshold(image_prep)
 
         else:
             image_prep = image_utils.otsuthreshold(image_prep)
 
+        # convert the image to a jpg string
         image_str = image_utils.convertimagetojpgstring(image_prep)
 
+        # build the request
         request = google_utils.buildrequest(image_str, max_results, 'TEXT_DETECTION')
 
         response = yield from session.post(self._GOOGLE_VISION_API_ENDPOINT, data=json.dumps(request))

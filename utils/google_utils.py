@@ -2,7 +2,7 @@ import base64
 
 
 def buildrequest(image_str, max_results, detection_type):
-    ''' returns the Google Vision API request '''
+    """ returns the Google Vision API request with the right encoding """
 
     request = {'requests':
         [

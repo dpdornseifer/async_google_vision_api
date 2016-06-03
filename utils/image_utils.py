@@ -3,7 +3,7 @@ import numpy as np
 
 
 def convertimagetoopencvarray(image):
-    ''' convert image from jpg to and numpy array to be able to apply the opencv methods on the image '''
+    """ convert image from jpg to and numpy array to be able to apply the opencv methods on the image """
 
     image_array = np.asarray(bytearray(image), dtype="uint8")
     image_prep = cv2.imdecode(image_array, cv2.IMREAD_GRAYSCALE)
@@ -15,7 +15,7 @@ def convertimagetoopencvarray(image):
 
 
 def convertimagetojpgstring(image):
-    ''' opencv arrays have to be converted into an jpg string to be compatible to Google Vison API '''
+    """ opencv arrays have to be converted into an jpg string to be compatible to Google Vison API """
 
     image_buf = cv2.imencode('.jpg', image)[1]
     image_str = np.array(image_buf).tostring()
@@ -24,7 +24,7 @@ def convertimagetojpgstring(image):
 
 
 def adaptivethreshold(image):
-    ''' apply the adaptive threshold to the grayscale image to optimize for OCR '''
+    """ apply the adaptive threshold to the grayscale image to optimize for OCR """
 
     image_prep = cv2.medianBlur(image, 5)
     image_prep = cv2.adaptiveThreshold(image_prep, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
@@ -33,7 +33,7 @@ def adaptivethreshold(image):
 
 
 def otsuthreshold(image):
-    ''' apply the OTSU threshold to the grayscale image optimize for OCR '''
+    """ apply the OTSU threshold to the grayscale image optimize for OCR """
 
     image_prep = cv2.GaussianBlur(image, (5, 5), 0)
     image_prep = cv2.threshold(image_prep, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
@@ -42,7 +42,7 @@ def otsuthreshold(image):
 
 
 def getemotion(face):
-        ''' filter return for possible to very_likely emotions '''
+        """ filter return for possible to very_likely emotions """
 
         indicators = ['POSSIBLE', 'LIKELY', 'VERY_LIKELY']
         google_face_emotions = ['joyLikelihood', 'sorrowLikelihood', 'angerLikelihood', 'surpriseLikelihood',
@@ -59,7 +59,7 @@ def getemotion(face):
 
 
 def drawmostlikelyemotion(faces, image):
-    ''' draw a simple emoticon '''
+    """ draw a simple emoticon """
 
     for face in faces:
         x = face['fdBoundingPoly']['vertices'][0].get('x', 0.0)
@@ -97,7 +97,7 @@ def drawmostlikelyemotion(faces, image):
 
 
 def drawtextrectangle(json_response, image):
-    ''' draw a simple rectangle around the text '''
+    """ draw a simple rectangle around the text """
 
     texts = json_response['responses'][0]['textAnnotations']
 
